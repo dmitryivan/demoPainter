@@ -13,102 +13,145 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.os.*;
 import android.graphics.Rect;
+import android.graphics.*;
 
 public class MainActivity extends Activity { 		
-       
+	static View v;
     @Override
     public void onCreate(Bundle savedInstanceState)
-        {super.onCreate(savedInstanceState); setContentView(new DV(this));}
+        {super.onCreate(savedInstanceState); 
+		v=new DV(this);
+		setContentView(v);
+		}
+
        	   
 	class DV extends View {			
 		Paint p;
-		int dflag=2;
-		float x = 0;
-		float y = 0;
-		float evX;
-		float evY;
-		int cnt=0;
-		int col=-16711936;
-		int lc=-16711936;
-		int mc=-16711936;
-		int lcnt=0;
-		String st;
-		Bitmap bitmap;
-		Rect rect;
-		float [] mtx = new float[2000];
-		float [] mty = new float[2000];
-	    float [] dtx = new float[2000];
-		float [] dty = new float[2000];
-		float [] mcol= new float[2000];
-		float [] ml =  new float[100000];
-	    float [] ml2 = new float[25000];
+		int maxHistory=100000;
+		float x;
+		float y;
 		float oldX;
 		float oldY;
+		float evX;
+		float evY;
+		float maxRad;
+		int figType=1; //default figure - line
+		int cnt;     //current figure
+		int col=-16711936;
+		int [] figC = new int [maxHistory];  //figure color
+		int [] figT = new int [maxHistory];  //figure type
+		float [] figX1 = new float [maxHistory]; //coordinates: top x,y; down x,y
+		float [] figY1 = new float [maxHistory];
+		float [] figX2 = new float [maxHistory];
+		float [] figY2 = new float [maxHistory];		
 		final int maxX;
 		final int maxY;
+		String st;
+		Bitmap bitmap;
+		Bitmap b;
+		Rect rect;
 		FileOutputStream fos=null;
+		boolean inMenu;
+		Context con;
 		
 	DV (Context c){
 		super(c);
+		con=c;
 		Display display = getWindowManager().getDefaultDisplay();
 		maxX=display.getWidth();	
 		maxY=display.getHeight();
         p=new Paint();
 		p.setColor(Color.GREEN);
-		p.setStrokeWidth(5);
-		
-		//st=Environment.getExternalStorageDirectory().toString()+"appproject/My App/res/1.jpg";
-		//bitmap=BitmapFactory.decodeFile(st);
+		p.setStrokeWidth(5);		
 		bitmap=BitmapFactory.decodeResource(getResources(), R.drawable.i1);
 		rect=new Rect(0,0,maxX,maxY-50);
-	    //bitmap = Bitmap.createBitmap(bitmapS,2,2,100,100);
-		//Canvas canvas=new Canvas(bitmap);
-		//bitmap.compress(Bitmap,CompressFormat.JPEG,100,fos);
 		}
-		
-				
+	
+	void saveFile(){
+     	 b=v.getDrawingCache();		
+	     try{
+    	     b.compress(Bitmap.CompressFormat.JPEG,95,
+             new FileOutputStream( Environment.getExternalStorageDirectory()+"/aaaa.jpg"));			  
+		 }catch (Exception e) { e.printStackTrace();}		
+		 v.setDrawingCacheEnabled(false);
+    }
+	
+		public void takeScreenshot(Activity activity) {  
+			View view = activity.getWindow().getDecorView();  
+			Bitmap bitmap = view.getDrawingCache();  			 
+			try{
+				bitmap.compress(Bitmap.CompressFormat.JPEG,95,
+						   new FileOutputStream( Environment.getExternalStorageDirectory()+"/aaaa.jpg"));	
+			}catch (Exception e) { e.printStackTrace();}
+			}
+			
 	protected void onDraw (Canvas canvas)
 	   {		      
-		   canvas.drawBitmap(bitmap, null, rect,  p);
-		 
-		   for (int i=0; i<cnt; i++){
-			   p.setColor((int)mcol[i]);
-			   canvas.drawRect (mtx[i], mty[i], dtx[i], dty[i], p);}
-		   for (int i=0; i<lcnt; i=i+4){
-			   p.setColor((int)ml2[i/4]);
-			   canvas.drawLine((int)ml[i],(int)ml[i+1],(int)ml[i+2],(int)ml[i+3], p);}
-		       
+	       canvas.drawBitmap(bitmap, null, rect,  p); //draw menu 
+
+		   for (int i=0; i<cnt; i++){ //draw history
+			   p.setColor(figC[i]);
+			  
+			   if (figT[i]==1) canvas.drawLine (figX1[i], figY1[i], figX2[i], figY2[i], p); 
+			   if (figT[i]==2) canvas.drawRect (figX1[i], figY1[i], figX2[i], figY2[i], p);
+			   if (figT[i]==3) canvas.drawLine (figX1[i], figY1[i], figX2[i], figY2[i], p);
+		       if (figT[i]==4) canvas.drawCircle (figX1[i], figY1[i], figX2[i], p); 
+			   }
+
 		   p.setColor(col);   
-		   if (dflag==1) canvas.drawRect (oldX, oldY, x, y, p);
-	   }
-		
-	public void colorMenu(){
-		if (evY>2 & evY<50)  col=-16711936;				   
-		if (evY>50&evY<100)  col=-16776961;
-		if (evY>100&evY<150) col=-16711681;
-		if (evY>150&evY<200) col=-16777216;
-		if (evY>200&evY<250) col=-65281;
-		if (evY>250&evY<300) col=-65536;
-		if (evY>300) col=-256;
-	}	
+		   if (figType==1) canvas.drawLine (oldX, oldY, x, y, p); 
+		   if (figType==2) canvas.drawRect (oldX, oldY, x, y, p); //preview current figure
+		   if (figType==3) canvas.drawLine (oldX, oldY, x, y, p);
+		   if (figType==4) canvas.drawCircle (oldX, oldY, maxRadius(), p); 
+		   if (figType==5) takeScreenshot((Activity)con);
+		   }
 	
-	void drawMove(){
-		oldX=x;
-		oldY=y;
-		x = evX;
-		y = evY;	 
-		ml[lcnt]=oldX;
-		ml[lcnt+1]=oldY;
-		ml[lcnt+2]=x;
-		ml[lcnt+3]=y;
-		ml2[lcnt/4]=col;
-		lcnt=lcnt+4;
-	}
-		
-		boolean inBorders(float x, float y){
-			if (x>50 && x<maxX-50){return true;} 
-			else {return false;}
+	void toolMenu(){
+		if (evY>1 & evY<50)    figType=1;				   
+		if (evY>50 & evY<100)  figType=2;
+		if (evY>100 & evY<150) figType=3;
+		if (evY>150 & evY<200) figType=4;
+		if (evY>200 & evY<250) figType=5;
+		if (evY>250 & evY<300) figType=6; 
+		if (evY>300)           figType=7;
+    	inMenu=true;
+		}	
+		   
+	void colorMenu(){
+		if (evY>1 & evY<50)    col=-16711936;				   
+		if (evY>50 & evY<100)  col=-16776961;
+		if (evY>100 & evY<150) col=-16711681;
+		if (evY>150 & evY<200) col=-16777216;
+		if (evY>200 & evY<250) col=-65281;
+		if (evY>250 & evY<300) col=-65536;
+		if (evY>300)           col=-256;
+		inMenu=true;
+    	}	
+	
+	void saveMov(){
+		figC[cnt]=col;
+		figT[cnt]=figType;
+		figX1[cnt]= oldX;
+		figY1[cnt]= oldY;
+		if (figType==4) {
+			figX2[cnt]=maxRadius();
+		} else	figX2[cnt]= x;
+		figY2[cnt]= y;
+		cnt++;
 		}
+	
+	float maxRadius(){
+		maxRad=(float)Math.hypot(x-oldX,y-oldY);
+		if ((oldX+maxRad)>(maxX-50)) maxRad=maxX-50-oldX;
+		if (oldX-maxRad<50) maxRad=oldX-50;
+		return maxRad;
+	}	
+		
+		
+	boolean inBorders(){
+		if (evX>50 && evX<maxX-50){return true;} 
+		else {return false;}
+	    }
 	
 	 @Override
 	 public boolean onTouchEvent (MotionEvent event)
@@ -119,40 +162,40 @@ public class MainActivity extends Activity {
 			 switch (event.getAction())
 	    	 {
 			     case MotionEvent.ACTION_DOWN:	
-				   if (evX>maxX-50) {colorMenu();} else { 
-		     		   if (evX<50){
-							 if (evY<50){dflag=2;}else{ dflag=1; }
-							 
-							 }}
-							 if (evX>50 && evX<975){
-								 oldX=evX;
-						         oldY=evY;
-				                 x=evX+1;
-						         y=evY+1;
-							 }
-						 break;
+				   if (evX>maxX-50) colorMenu(); //select color
+				   if (evX<50) toolMenu();  //select figure type
+				   if (inBorders()) {
+								 x=oldX=evX;
+						         y=oldY=evY;
+								 }
+				       break;
 					 
 				 case MotionEvent.ACTION_MOVE:  
 					 {	
-					 if (inBorders(evX,evY)){if (dflag==1){			
-						 x = evX;
-						 y = evY;	
-						 }	else {
-							 if (evX-x>1 | x-evX>1)	{ drawMove(); }
-					         }
-					 }} break;
+					 if (inBorders())
+						 {
+					      if (figType==1){ //if figure is Line - save, else - resize
+							 oldX=x;
+							 oldY=y;
+							 x = evX;
+							 y = evY;
+							 saveMov();
+					      } else {
+							 x = evX;
+							 y = evY;
+							 }
+						  }
+					 } break;
 					 
 				 case MotionEvent.ACTION_UP: 
-			     if (inBorders(evX,evY)){    
-				 if (dflag==1){
-				     mtx[cnt]=oldX;
-					 mty[cnt]=oldY;
-					 dtx[cnt]=x;
-					 dty[cnt]=y;
-					 mcol[cnt]=col;
-					 cnt++;
-					 break;		
-					 }	}
+		             if (inMenu) {inMenu=false; break;} 
+					 if (!inBorders())
+					{
+					    if (evX<50) x=50;
+					    if (evX>maxX-50) x=maxX-50;
+					 }
+				     saveMov();
+					 break;			
 		       }
 			 
 	    invalidate(); 
